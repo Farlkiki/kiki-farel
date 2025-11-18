@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Security System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            min-height: 100vh; padding: 20px; 
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { 
+            text-align: center; color: white; 
+            margin-bottom: 20px; padding: 20px;
+            background: rgba(255,255,255,0.1); 
+            border-radius: 15px; 
+        }
+        .card { 
+            background: white; border-radius: 10px; 
+            padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .status-light { 
+            width: 50px; height: 50px; border-radius: 50%;
+            display: inline-block; margin-right: 15px;
+        }
+        .active { background: #4CAF50; box-shadow: 0 0 20px #4CAF50; }
+        .inactive { background: #f44336; }
+        .control-button { 
+            width: 100%; padding: 15px; 
+            border: none; border-radius: 8px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            margin: 5px 0;
+        }
+        .on { background: #4CAF50; color: white; }
+        .off { background: #f44336; color: white; }
+        .counter { 
+            font-size: 3em; font-weight: bold; 
+            text-align: center; margin: 10px 0;
+        }
+        .log-entry { 
+            padding: 8px; border-left: 3px solid #667eea;
+            margin: 5px 0; background: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 SISTEM KEAMANAN BANK</h1>
+            <p>Laser Security & LDR Sensor Monitoring</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Kontrol Sistem -->
+            <div class="card">
+                <h2>🛡️ Kontrol Sistem</h2>
+                <div style="margin: 15px 0;">
+                    <span id="statusLight" class="status-light inactive"></span>
+                    <span id="statusText" style="font-weight: bold;">SISTEM MATI</span>
+                </div>
+                <button id="toggleButton" class="control-button on" onclick="toggleSystem()">
+                    AKTIFKAN SISTEM
+                </button>
+                <button class="control-button" onclick="calibrateSensor()" style="background: #2196F3; color: white;">
+                    🔧 Kalibrasi Sensor
+                </button>
+            </div>
+
+            <!-- Deteksi -->
+            <div class="card">
+                <h2>👤 Deteksi Pengunjung</h2>
+                <div style="background: #667eea; color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                    <div>TOTAL TERDETEKSI</div>
+                    <div id="counterDisplay" class="counter">0</div>
+                    <div>Orang Melewati Laser</div>
+                </div>
+                <button class="control-button" onclick="resetCounter()" style="background: #ff9800; color: white;">
+                    🔄 Reset Counter
+                </button>
+            </div>
+        </div>
+
+        <!-- Log -->
+        <div class="card">
+            <h2>📋 Log Aktivitas</h2>
+            <div id="logContainer" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script>
+        let systemActive = false;
+
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                systemActive = data.system_active;
+                updateUI(systemActive);
+                
+                // Update counter
+                document.getElementById('counterDisplay').textContent = data.intrusion_count;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                addLog('❌ Gagal terhubung ke ESP32');
+            }
+        }
+
+        async function toggleSystem() {
+            try {
+                const response = await fetch('/api/toggle', { method: 'POST' });
+                const data = await response.json();
+                systemActive = data.system_active;
+                updateUI(systemActive);
+                
+                addLog(systemActive ? '✅ Sistem diaktifkan' : '⛔ Sistem dimatikan');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function resetCounter() {
+            try {
+                await fetch('/api/reset', { method: 'POST' });
+                document.getElementById('counterDisplay').textContent = 0;
+                addLog('🔄 Counter direset');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function calibrateSensor() {
+            try {
+                addLog('🔧 Kalibrasi sensor...');
+                await fetch('/api/calibrate', { method: 'POST' });
+                addLog('✅ Kalibrasi selesai');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function updateUI(isActive) {
+            const statusLight = document.getElementById('statusLight');
+            const statusText = document.getElementById('statusText');
+            const toggleButton = document.getElementById('toggleButton');
+
+            if (isActive) {
+                statusLight.className = 'status-light active';
+                statusText.textContent = 'SISTEM AKTIF';
+                statusText.style.color = '#4CAF50';
+                toggleButton.className = 'control-button off';
+                toggleButton.textContent = 'MATIKAN SISTEM';
+            } else {
+                statusLight.className = 'status-light inactive';
+                statusText.textContent = 'SISTEM MATI';
+                statusText.style.color = '#f44336';
+                toggleButton.className = 'control-button on';
+                toggleButton.textContent = 'AKTIFKAN SISTEM';
+            }
+        }
+
+        function addLog(message) {
+            const logContainer = document.getElementById('logContainer');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            const time = new Date().toLocaleTimeString();
+            logEntry.innerHTML = `<small>${time}</small> - ${message}`;
+            
+            logContainer.prepend(logEntry);
+            
+            // Hapus log lama
+            if (logContainer.children.length > 10) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        // Update status setiap detik
+        setInterval(updateStatus, 1000);
+        
+        // Initial load
+        updateStatus();
+        addLog('💼 Sistem siap digunakan');
+    </script>
+</body>
+</html>
